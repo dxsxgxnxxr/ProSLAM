@@ -366,9 +366,9 @@ void GraphOptimizer::addPoseWithFactors(Frame* frame_) {
 void GraphOptimizer::optimizePoseGraph(WorldMap* world_map_) {
   CHRONOMETER_START(optimization)
 
-  //ds save current graph to file
-  const std::string file_name = "pose_graph_"+std::to_string(world_map_->currentFrame()->identifier())+".g2o";
-  _optimizer->save(file_name.c_str());
+//  //ds save current graph to file
+//  const std::string file_name = "pose_graph_"+std::to_string(world_map_->currentFrame()->identifier())+".g2o";
+//  _optimizer->save(file_name.c_str());
 
   //ds optimize graph
   _optimizer->initializeOptimization();
@@ -412,9 +412,11 @@ void GraphOptimizer::optimizePoseGraph(WorldMap* world_map_) {
 void GraphOptimizer::optimizeFactorGraph(WorldMap* world_map_) {
   CHRONOMETER_START(optimization)
 
-  //ds optimize graph (uncomment lines below for g2o graph dumping)
-//  const std::string file_name = "factor_graph_"+std::to_string(world_map_->currentFrame()->identifier())+".g2o";
+//  //ds save current graph to file
+//  const std::string file_name = "pose_graph_"+std::to_string(world_map_->currentFrame()->identifier())+".g2o";
 //  _optimizer->save(file_name.c_str());
+
+  //ds optimize graph
   _optimizer->initializeOptimization();
   _optimizer->optimize(_parameters->maximum_number_of_iterations);
 
