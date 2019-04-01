@@ -247,7 +247,7 @@ void DepthFramePointGenerator::track(Frame* frame_,
       matched_indices_left.insert(feature_left->index_in_vector);
       _feature_matcher_left.feature_lattice[feature_left->row][feature_left->col] = nullptr;
 
-      //ds if depth could not be retrieved and point triangulation is enabled
+      //ds if depth could not be retrieved but point triangulation is enabled
       if (depth_point[2] >= _parameters->maximum_depth_meters && _parameters->enable_point_triangulation) {
 
         //ds allocate a new framepoint to the temporary framepoints buffer (points without measured depth)
@@ -258,7 +258,7 @@ void DepthFramePointGenerator::track(Frame* frame_,
         continue;
       }
 
-      //ds allocate a framepoint
+      //ds allocate a framepoint for the measured depth
       FramePoint* framepoint = frame_->createFramepoint(feature_left, PointCoordinates(depth_point[0], depth_point[1], depth_point[2]), point_previous);
 
       //ds check if we have an estimated depth point that entered the active point set

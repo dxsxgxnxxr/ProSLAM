@@ -478,8 +478,8 @@ void PoseTracker3D::_updatePoints(WorldMap* context_, Frame* frame_) {
     }
     assert(point->previous());
 
-    //ds check if the point is linked to a landmark
-    Landmark* landmark = point->previous()->landmark();
+    //ds check if the point is linked to a landmark (we can have holes in the framepoint chain for low confidence)
+    Landmark* landmark = point->origin()->landmark();
 
     //ds if there's no landmark yet
     if (!landmark) {
