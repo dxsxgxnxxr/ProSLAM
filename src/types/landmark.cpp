@@ -19,6 +19,7 @@ Landmark::Landmark(FramePoint* point_, const LandmarkParameters* parameters_): _
   _world_coordinates.setZero();
   FramePoint* framepoint = point_;
   while (framepoint) {
+    assert(framepoint->landmark() == nullptr);
     framepoint->setLandmark(this);
     _measurements.push_back(Measurement(framepoint));
     _descriptors.push_back(framepoint->descriptorLeft());
@@ -33,13 +34,14 @@ Landmark::Landmark(FramePoint* point_, const LandmarkParameters* parameters_): _
 
 Landmark::~Landmark() {
 
-  //ds if the landmark is connected to framepoints (is not the case after being merged into another landmark!)
+  //ds if the landmark is connected to framepoints (is not the case anymore after being merged into another landmark!)
   if (_origin) {
 
     //ds decouple itself from all framepoints
     assert(!_origin->previous());
     FramePoint* point = _origin;
     while (point) {
+      assert(point == point->next());
       point->setLandmark(nullptr);
       point = point->next();
     }
@@ -69,6 +71,8 @@ void Landmark::update(FramePoint* point_) {
   assert(_last_update->origin() == _origin);
   assert(point_->previous() == _last_update);
   _last_update = point_;
+
+  //ds only at this point a framepoint will get associated automatically with a landmark!
   _last_update->setLandmark(this);
 
   //ds update appearance history (left descriptors only)
@@ -170,6 +174,7 @@ void Landmark::merge(Landmark* landmark_) {
   }
   assert(landmark_);
   assert(_identifier < landmark_->_identifier);
+  assert(_origin != landmark_->_origin);
   assert(_origin->identifier() < landmark_->_origin->identifier());
 
   //ds merge landmark appearances (owned by HBST for relocalization)
@@ -201,38 +206,43 @@ void Landmark::merge(Landmark* landmark_) {
   _measurements.insert(_measurements.end(), landmark_->_measurements.begin(), landmark_->_measurements.end());
   landmark_->_measurements.clear();
 
-  //ds in case the framepoints to merge are older than the current (smaller identifier) - we need to insert
   assert(!landmark_->_origin->previous());
   assert(landmark_->_origin->next());
-  if (landmark_->_last_update->identifier() < _last_update->identifier()) {
+  assert(landmark_->_origin->identifier() != _last_update->identifier());
 
-    //ds look for the insertion point
-    FramePoint* insertionPoint = _origin;
-    while(insertionPoint->next()->identifier() < landmark_->_origin->identifier()) {
-      assert(insertionPoint->next());
-      insertionPoint = insertionPoint->next();
-    }
+  //ds in case some of the framepoints to merge are older than the current (smaller identifier)
+  if (landmark_->_origin->identifier() < _last_update->identifier()) {
 
-    //ds bookkeep next of insertion point
-    FramePoint* next = insertionPoint->next();
-
-    //ds connect foreign origin with insertion point - this breaks the next of the original insertion point
-    landmark_->_origin->setPrevious(insertionPoint);
-    landmark_->_origin->setLandmark(this);
-
-    //ds connect last point in the foreign chain with the next of the insertion point
-    next->setPrevious(landmark_->_last_update);
-
-    //ds set the landmark field and origin to all points inbetween, also updating the track length of the points afterwards
-    FramePoint* point = landmark_->_origin;
+    //ds accumulate framepoint identifiers from both landmarks
+    FramePointPointerVector framepoints_sorted;
+    framepoints_sorted.reserve(_measurements.size());
+    FramePoint* point = _origin;
+    framepoints_sorted.emplace_back(point);
     while (point->next()) {
+      assert(point->identifier() < point->next()->identifier());
       point = point->next();
-      point->setLandmark(this);
-      point->setTrackLength(point->previous()->trackLength()+1);
-      point->setOrigin(_origin);
+      framepoints_sorted.emplace_back(point);
     }
-    assert(point != landmark_->_last_update);
-    assert(point == _last_update);
+    point = landmark_->_origin;
+    framepoints_sorted.emplace_back(point);
+    while (point->next()) {
+      assert(point->identifier() < point->next()->identifier());
+      point = point->next();
+      framepoints_sorted.emplace_back(point);
+    }
+
+    //ds sort framepoints in ascending order by identifier
+    //ds due to multiple merges of landmarks from different times the framepoint ages can be mixed
+    std::sort(framepoints_sorted.begin(), framepoints_sorted.end(), [](const FramePoint* a, const FramePoint* b){return a->identifier() < b->identifier();});
+    _origin = framepoints_sorted[0];
+    assert(_origin == _origin->origin());
+    _origin->setLandmark(this);
+    for (Index index = 1; index < framepoints_sorted.size(); ++index) {
+      _last_update = framepoints_sorted[index];
+      _last_update->setPrevious(framepoints_sorted[index-1]);
+      _last_update->setLandmark(this);
+      assert(_last_update->previous()->identifier() < _last_update->identifier());
+    }
   } else {
 
     //ds connect framepoint history normally (last update of this with origin of absorbed landmark)
@@ -242,6 +252,7 @@ void Landmark::merge(Landmark* landmark_) {
     //ds update track lengths and landmark references until we arrive in the last framepoint of the absorbed landmark
     //ds which will replace the _last_update of this landmark
     while (_last_update->next()) {
+      assert(_last_update->identifier() < _last_update->next()->identifier());
       _last_update = _last_update->next();
       _last_update->setLandmark(this);
       _last_update->setTrackLength(_last_update->previous()->trackLength()+1);
